@@ -8,7 +8,7 @@ The script computes a **value score** = Intelligence Index / Price per 1M tokens
 
 The **Artificial Analysis Intelligence Index** is used as the performance metric because it weights agentic and coding tasks heavily: 25% Agents benchmarks (GDPval-AA + τ²-Bench Telecom) and 25% Coding benchmarks (Terminal-Bench Hard + SciCode), making 50% of the index directly relevant to agentic workloads.
 
-> Artificial Analysis. (2025). *Intelligence Benchmarking Methodology*. Retrieved from <https://artificialanalysis.ai/methodology/intelligence-benchmarking#artificial-analysis-intelligence-index>
+> Artificial Analysis. (2026). *Intelligence Benchmarking Methodology*. Retrieved from <https://artificialanalysis.ai/methodology/intelligence-benchmarking#artificial-analysis-intelligence-index>
 
 ## Methodology
 
@@ -47,7 +47,7 @@ curl -s https://artificialanalysis.ai/api/v2/data/llms/models \
 ```
 
 The returned keys contain no `artificial_analysis_agentic_index`. 
-The Intelligence Index is used as the best available proxy — roughly 
+The Intelligence Index is used as the best available proxy, roughly 
 50% of the index captures agentic capability.
 
 ## Data Source
