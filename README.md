@@ -36,10 +36,19 @@ Rank  Model                               Creator              Intel. Index   Pr
 ```
 
 ## Limitations
+The dedicated **Agentic Index** from Artificial Analysis is not available 
+in the free API tier, as confirmed by inspecting all evaluation keys 
+returned by the API:
 
-The dedicated **Agentic Index** from Artificial Analysis is not available in the free API tier. The Intelligence Index is used as the best available proxy, so roughly half of the index captures agentic capability.
+```bash
+curl -s https://artificialanalysis.ai/api/v2/data/llms/models \
+  -H "x-api-key: $AA_KEY" \
+  | jq '[.data[].evaluations | keys[]] | unique'
+```
 
-Models with a null Intelligence Index or null/zero price are excluded from ranking.
+The returned keys contain no `artificial_analysis_agentic_index`. 
+The Intelligence Index is used as the best available proxy — roughly 
+50% of the index captures agentic capability.
 
 ## Data Source
 
