@@ -1,4 +1,4 @@
-# cloud-llm-curator
+# GoodEnoughLLMs
 
 Fetches live LLM data from the [Artificial Analysis](https://artificialanalysis.ai) API and prints the top 5 models ranked by price/performance value score, optimised for agentic use cases.
 
