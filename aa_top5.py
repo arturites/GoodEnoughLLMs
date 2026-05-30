@@ -2,13 +2,31 @@
 
 import os
 import sys
-import requests
+import argparse
 
 
 API_URL = "https://artificialanalysis.ai/api/v2/data/llms/models"
+EFFORT_THRESHOLDS = {
+    "low": 0.70,
+    "medium": 0.80,
+    "high": 0.90,
+}
 
 
-def run_track(models, score_key, track_label, score_col_label):
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Find the cheapest good-enough LLMs from Artificial Analysis data."
+    )
+    parser.add_argument(
+        "--effort",
+        choices=EFFORT_THRESHOLDS.keys(),
+        default="medium",
+        help="Task effort level used for the minimum score threshold. Default: medium.",
+    )
+    return parser.parse_args()
+
+
+def run_track(models, score_key, track_label, score_col_label, effort, threshold_ratio):
     candidates = []
     for model in models:
         score = (model.get("evaluations") or {}).get(score_key)
@@ -27,9 +45,15 @@ def run_track(models, score_key, track_label, score_col_label):
         sys.exit(1)
 
     max_score = max(c["score"] for c in candidates)
-    threshold = max_score * 0.80
+    threshold = max_score * threshold_ratio
+    threshold_percent = int(threshold_ratio * 100)
+
     print(f"=== {track_label} Track ===")
-    print(f"{score_col_label} threshold (80% of max {max_score:.1f}): {threshold:.1f}\n")
+    print(f"Selected track: {track_label}")
+    print(f"Selected effort: {effort}")
+    print(f"Threshold percentage: {threshold_percent}%")
+    print(f"Maximum {score_col_label}: {max_score:.1f}")
+    print(f"Minimum {score_col_label} threshold: {threshold:.1f}\n")
 
     scored = [
         {**c, "value": c["score"] / c["price"]}
@@ -51,10 +75,15 @@ def run_track(models, score_key, track_label, score_col_label):
 
 
 def main():
+    args = parse_args()
+    threshold_ratio = EFFORT_THRESHOLDS[args.effort]
+
     api_key = os.environ.get("AA_KEY")
     if not api_key:
         print("Error: AA_KEY environment variable is not set.")
         sys.exit(1)
+
+    import requests
 
     response = requests.get(API_URL, headers={"x-api-key": api_key})
     if not response.ok:
@@ -63,8 +92,22 @@ def main():
 
     models = response.json()["data"]
 
-    run_track(models, "artificial_analysis_intelligence_index", "Agentic", "Intel. Index")
-    run_track(models, "artificial_analysis_coding_index", "Coding", "Coding Index")
+    run_track(
+        models,
+        "artificial_analysis_intelligence_index",
+        "Agentic",
+        "Intel. Index",
+        args.effort,
+        threshold_ratio,
+    )
+    run_track(
+        models,
+        "artificial_analysis_coding_index",
+        "Coding",
+        "Coding Index",
+        args.effort,
+        threshold_ratio,
+    )
 
 
 if __name__ == "__main__":

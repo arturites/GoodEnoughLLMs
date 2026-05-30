@@ -4,7 +4,7 @@ Fetches live LLM data from the [Artificial Analysis](https://artificialanalysis.
 
 ## What it does & why
 
-The script computes a **value score** = Score Index / Price per 1M tokens, then ranks all models and prints the top 5 for each track.
+The script computes a **value score** = Score Index / Price per 1M tokens, then ranks all models that are good enough for the selected effort level. The goal is not necessarily to recommend the absolute smartest model. It is to find the cheapest suitable model for the selected task complexity.
 
 ### Agentic Track
 
@@ -18,7 +18,20 @@ The **Artificial Analysis Coding Index** (`artificial_analysis_coding_index`) is
 
 ## Methodology
 
-The script dynamically calculates a minimum score threshold of 80% of the highest available index value for each track. This ensures only top-tier models are ranked, regardless of how scores evolve over time as new models are released.
+The script dynamically calculates a minimum score threshold from the highest available index value for each track. It always shows both built-in tracks:
+
+- Agentic Track
+- Coding Track
+
+Use `--effort` to choose how close a model needs to be to the best available score:
+
+| Effort | Minimum score threshold |
+| ------ | ----------------------- |
+| low    | 70% of the best available score |
+| medium | 80% of the best available score |
+| high   | 90% of the best available score |
+
+`medium` is the default and matches the previous 80% behavior.
 
 ## Setup
 
@@ -33,18 +46,36 @@ export AA_KEY=your_api_key_here
 python aa_top5.py
 ```
 
+Select an effort level:
+
+```bash
+python aa_top5.py --effort low
+python aa_top5.py --effort medium
+python aa_top5.py --effort high
+```
+
+The same command prints both the Agentic and Coding tracks. Use lower effort for simpler tasks where cheaper models may be good enough, and higher effort for harder tasks where the model should be closer to the best available score.
+
 Example output:
 
 ```
 === Agentic Track ===
-Intel. Index threshold (80% of max 85.0): 68.0
+Selected track: Agentic
+Selected effort: medium
+Threshold percentage: 80%
+Maximum Intel. Index: 85.0
+Minimum Intel. Index threshold: 68.0
 
 Rank  Model                               Creator              Intel. Index   Price/1M  Value Score
 ----------------------------------------------------------------------------------------------------
 1     ...                                 ...                         ...       ...          ...
 
 === Coding Track ===
-Coding Index threshold (80% of max 72.0): 57.6
+Selected track: Coding
+Selected effort: medium
+Threshold percentage: 80%
+Maximum Coding Index: 72.0
+Minimum Coding Index threshold: 57.6
 
 Rank  Model                               Creator              Coding Index   Price/1M  Value Score
 ----------------------------------------------------------------------------------------------------
