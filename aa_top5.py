@@ -10,6 +10,7 @@ EFFORT_THRESHOLDS = {
     "low": 0.70,
     "medium": 0.80,
     "high": 0.90,
+    "xhigh": 0.99,
 }
 
 
@@ -41,7 +42,10 @@ def run_track(models, score_key, track_label, score_col_label, effort, threshold
         })
 
     if not candidates:
-        print(f"Error: no models with populated {score_key}. Cannot run {track_label} track.")
+        print(
+            f"Error: no models with both populated {score_key} and price. "
+            f"Cannot run {track_label} track."
+        )
         sys.exit(1)
 
     max_score = max(c["score"] for c in candidates)

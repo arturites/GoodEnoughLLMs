@@ -14,7 +14,7 @@ The **Artificial Analysis Intelligence Index** is used as the performance metric
 
 ### Coding Track
 
-The **Artificial Analysis Coding Index** (`artificial_analysis_coding_index`) is used as the performance metric. It directly measures coding capability across dedicated coding benchmarks. If this key is unpopulated for all models in the API response, the script exits with a clear error.
+The **Artificial Analysis Coding Index** is used as the performance metric. It directly measures coding capability across dedicated coding benchmarks. If this key is unpopulated for all models in the API response, the script exits with a clear error.
 
 ## Methodology
 
@@ -30,6 +30,7 @@ Use `--effort` to choose how close a model needs to be to the best available sco
 | low    | 70% of the best available score |
 | medium | 80% of the best available score |
 | high   | 90% of the best available score |
+| xhigh  | 99% of the best available score |
 
 `medium` is the default and matches the previous 80% behavior.
 
@@ -52,6 +53,7 @@ Select an effort level:
 python aa_top5.py --effort low
 python aa_top5.py --effort medium
 python aa_top5.py --effort high
+python aa_top5.py --effort xhigh
 ```
 
 The same command prints both the Agentic and Coding tracks. Use lower effort for simpler tasks where cheaper models may be good enough, and higher effort for harder tasks where the model should be closer to the best available score.
