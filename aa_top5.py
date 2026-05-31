@@ -6,6 +6,7 @@ import argparse
 
 
 API_URL = "https://artificialanalysis.ai/api/v2/data/llms/models"
+DATA_CREDIT = "Data provided by Artificial Analysis — https://artificialanalysis.ai/"
 EFFORT_THRESHOLDS = {
     "low": 0.70,
     "medium": 0.80,
@@ -112,6 +113,7 @@ def main():
         args.effort,
         threshold_ratio,
     )
+    print(DATA_CREDIT)
 
 
 if __name__ == "__main__":

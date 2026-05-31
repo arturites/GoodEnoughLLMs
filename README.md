@@ -82,6 +82,8 @@ Minimum Coding Index threshold: 57.6
 Rank  Model                               Creator              Coding Index   Price/1M  Value Score
 ----------------------------------------------------------------------------------------------------
 1     ...                                 ...                         ...       ...          ...
+
+Data provided by Artificial Analysis — https://artificialanalysis.ai/
 ```
 
 ## Limitations
