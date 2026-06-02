@@ -1,4 +1,4 @@
-# Data provided by Artificial Analysis - https://artificialanalysis.ai/
+# Data provided by Artificial Analysis — https://artificialanalysis.ai/
 
 from __future__ import annotations
 
@@ -13,12 +13,18 @@ from pathlib import Path
 
 
 API_URL = "https://artificialanalysis.ai/api/v2/data/llms/models"
-DATA_CREDIT = "Data provided by Artificial Analysis - https://artificialanalysis.ai/"
+DATA_CREDIT = "Data provided by Artificial Analysis — https://artificialanalysis.ai/"
 EFFORT_THRESHOLDS = {
     "low": 0.70,
     "medium": 0.80,
     "high": 0.90,
     "xhigh": 0.99,
+}
+EFFORT_DISPLAY = {
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "xhigh": "XHigh",
 }
 
 
@@ -189,6 +195,16 @@ def onboarding_message(env_file: Path) -> str:
     )
 
 
+def render_session_header(effort: str) -> None:
+    print(f"GoodEnoughLLMs — {EFFORT_DISPLAY[effort]} Effort")
+    print()
+
+
+def format_price(price: float) -> str:
+    price_text = f"{price:.4f}".rstrip("0").rstrip(".")
+    return f"${price_text}"
+
+
 def run_track(
     models: list[dict[str, object]],
     score_key: str,
@@ -236,12 +252,10 @@ def run_track(
     threshold = max_score * threshold_ratio
     threshold_percent = int(threshold_ratio * 100)
 
-    print(f"=== {track_label} Track ===")
-    print(f"Selected track: {track_label}")
-    print(f"Selected effort: {effort}")
+    print(f"{track_label} Track")
+    print(f"Threshold: {threshold_percent}%")
     if provider_filter:
         print(f"Provider filter: {provider_filter}")
-    print(f"Threshold percentage: {threshold_percent}%")
     print(f"Maximum {score_col_label}: {max_score:.1f}")
     print(f"Minimum {score_col_label} threshold: {threshold:.1f}\n")
 
@@ -253,18 +267,13 @@ def run_track(
 
     top5 = sorted(scored, key=lambda item: item["value"], reverse=True)[:5]
 
-    header = (
-        f"{'Rank':<5} {'Model':<35} {'Creator':<20} "
-        f"{score_col_label:>12} {'Price/1M':>10} {'Value Score':>12}"
-    )
-    print(header)
-    print("-" * len(header))
     for index, model in enumerate(top5, 1):
-        print(
-            f"{index:<5} {model['model']:<35} {model['creator']:<20} "
-            f"{model['score']:>12.1f} {model['price']:>10.4f} {model['value']:>12.1f}"
-        )
-    print()
+        print(f"{index}. {model['model']}")
+        print(f"   Creator: {model['creator']}")
+        print(f"   {score_col_label}: {model['score']:.1f}")
+        print(f"   Price/1M: {format_price(model['price'])}")
+        print(f"   Value Score: {model['value']:.1f}")
+        print()
 
     return True
 
@@ -290,6 +299,8 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 1
+
+        render_session_header(effort)
 
         if not run_track(
             models,
