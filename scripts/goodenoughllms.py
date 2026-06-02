@@ -9,9 +9,9 @@ from pathlib import Path
 
 def find_repo_root(start: Path) -> Path:
     for candidate in (start, *start.parents):
-        if (candidate / "aa_top5.py").is_file():
+        if (candidate / "SKILL.md").is_file() and (candidate / "aa_top5.py").is_file():
             return candidate
-    raise RuntimeError("Could not locate aa_top5.py from the skill wrapper.")
+    raise RuntimeError("Could not locate the GoodEnoughLLMs skill root.")
 
 
 def main(argv: list[str] | None = None) -> int:
