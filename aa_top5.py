@@ -35,16 +35,7 @@ def global_env_file_path() -> Path:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Find the cheapest good-enough LLMs from Artificial Analysis data.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=(
-            "Examples:\n"
-            "  python3 aa_top5.py\n"
-            "  python3 aa_top5.py --effort high\n"
-            "  python3 aa_top5.py --provider OpenAI\n\n"
-            "AA_KEY is read from the process environment first, then from "
-            "$XDG_CONFIG_HOME/goodenoughllms/.env (default: ~/.config/goodenoughllms/.env)."
-        ),
+        description="Find the cheapest good-enough LLMs from Artificial Analysis data."
     )
     parser.add_argument(
         "--effort",
