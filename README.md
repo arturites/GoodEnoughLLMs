@@ -56,6 +56,21 @@ python aa_top5.py --effort high
 python aa_top5.py --effort xhigh
 ```
 
+Filter by provider/creator:
+
+```bash
+python aa_top5.py --provider OpenAI
+python aa_top5.py --provider Anthropic
+```
+
+The `--provider` option filters models by the provider name from `model_creator.name`. Matching is case-insensitive and uses substring matching, so `--provider openai` matches `OpenAI` and `--provider meta` matches providers such as `Meta`.
+
+Combine effort and provider filters:
+
+```bash
+python aa_top5.py --effort high --provider OpenAI
+```
+
 The same command prints both the Agentic and Coding tracks. Use lower effort for simpler tasks where cheaper models may be good enough, and higher effort for harder tasks where the model should be closer to the best available score.
 
 Example output:

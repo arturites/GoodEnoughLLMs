@@ -25,10 +25,22 @@ def parse_args():
         default="medium",
         help="Task effort level used for the minimum score threshold. Default: medium.",
     )
+    parser.add_argument(
+        "--provider",
+        help="Filter models by provider/creator name. Case-insensitive substring match.",
+    )
     return parser.parse_args()
 
 
-def run_track(models, score_key, track_label, score_col_label, effort, threshold_ratio):
+def run_track(
+    models,
+    score_key,
+    track_label,
+    score_col_label,
+    effort,
+    threshold_ratio,
+    provider_filter=None,
+):
     candidates = []
     for model in models:
         score = (model.get("evaluations") or {}).get(score_key)
@@ -56,6 +68,8 @@ def run_track(models, score_key, track_label, score_col_label, effort, threshold
     print(f"=== {track_label} Track ===")
     print(f"Selected track: {track_label}")
     print(f"Selected effort: {effort}")
+    if provider_filter:
+        print(f"Provider filter: {provider_filter}")
     print(f"Threshold percentage: {threshold_percent}%")
     print(f"Maximum {score_col_label}: {max_score:.1f}")
     print(f"Minimum {score_col_label} threshold: {threshold:.1f}\n")
@@ -96,6 +110,20 @@ def main():
         sys.exit(1)
 
     models = response.json()["data"]
+    if args.provider:
+        provider_filter = args.provider.strip().lower()
+        models = [
+            model
+            for model in models
+            if provider_filter
+            and provider_filter in (model.get("model_creator") or {}).get("name", "").lower()
+        ]
+        if not models:
+            print(
+                f"Error: no models found for provider filter '{args.provider}'.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     run_track(
         models,
@@ -104,6 +132,7 @@ def main():
         "Intel. Index",
         args.effort,
         threshold_ratio,
+        args.provider.strip() if args.provider else None,
     )
     run_track(
         models,
@@ -112,6 +141,7 @@ def main():
         "Coding Index",
         args.effort,
         threshold_ratio,
+        args.provider.strip() if args.provider else None,
     )
     print(DATA_CREDIT)
 
