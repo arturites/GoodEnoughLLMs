@@ -1,7 +1,7 @@
 ---
 name: goodenoughllms
 description: Fetches Artificial Analysis model rankings and prints the top 5 cheapest good-enough LLMs for agentic and coding tasks. Use when you need a value-based shortlist with effort and provider filters.
-compatibility: Requires Python 3.11+, network access to Artificial Analysis, and an AA_KEY in the process environment or in $XDG_CONFIG_HOME/goodenoughllms/.env.
+compatibility: Requires Python 3.11+, network access to Artificial Analysis, and an AA_KEY in the process environment or in a skill-local .env file next to SKILL.md.
 ---
 
 # GoodEnoughLLMs
@@ -42,10 +42,10 @@ python3 scripts/goodenoughllms.py --help
 ## Key handling
 
 - Check `AA_KEY` in the process environment first.
-- If it is missing, read the global user config file at `$XDG_CONFIG_HOME/goodenoughllms/.env` (default `~/.config/goodenoughllms/.env`).
-- If the key is still missing, show onboarding, include `AA_KEY=your_api_key_here`, and stop without making an API call.
-- Do not use or create a repo-local `.env`.
-- Do not commit secrets.
+- If it is missing, read `.env` from the skill root, directly next to `SKILL.md`.
+- The repository includes `.env.example` as the template for `.env`.
+- If the key is still missing, show onboarding and stop without making an API call.
+- Do not commit `.env`.
 
 ## Output
 

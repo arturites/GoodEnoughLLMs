@@ -20,22 +20,36 @@ EFFORT_THRESHOLDS = {
     "high": 0.90,
     "xhigh": 0.99,
 }
-ENV_FILE_NAME = ".env"
-CONFIG_DIR_NAME = "goodenoughllms"
 
 
 class AppError(Exception):
     """Recoverable application error."""
 
 
-def global_env_file_path() -> Path:
-    config_home = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
-    return Path(config_home) / CONFIG_DIR_NAME / ENV_FILE_NAME
+def skill_root() -> Path:
+    return Path(__file__).resolve().parent
+
+
+def skill_env_file_path() -> Path:
+    return skill_root() / ".env"
+
+
+def skill_env_example_path() -> Path:
+    return skill_root() / ".env.example"
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Find the cheapest good-enough LLMs from Artificial Analysis data."
+        description="Find the cheapest good-enough LLMs from Artificial Analysis data.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  python3 scripts/goodenoughllms.py\n"
+            "  python3 scripts/goodenoughllms.py --effort high\n"
+            "  python3 scripts/goodenoughllms.py --provider OpenAI\n\n"
+            "AA_KEY is read from the process environment first, then from the "
+            "skill-local .env file next to SKILL.md."
+        ),
     )
     parser.add_argument(
         "--effort",
@@ -79,12 +93,15 @@ def read_api_key_from_env_file(env_file: Path) -> str | None:
     return None
 
 
-def load_api_key() -> str | None:
-    api_key = os.environ.get("AA_KEY", "").strip()
+def load_api_key(env: dict[str, str] | os._Environ[str] | None = None, env_file: Path | None = None) -> str | None:
+    active_env = os.environ if env is None else env
+    candidate_file = skill_env_file_path() if env_file is None else env_file
+
+    api_key = active_env.get("AA_KEY", "").strip()
     if api_key:
         return api_key
 
-    api_key = read_api_key_from_env_file(global_env_file_path())
+    api_key = read_api_key_from_env_file(candidate_file)
     if api_key:
         return api_key
 
@@ -159,13 +176,16 @@ def filter_models_by_provider(models: list[dict[str, object]], provider_filter: 
 
 def onboarding_message(env_file: Path) -> str:
     return (
-        "Error: AA_KEY is not set.\n\n"
-        "Onboarding:\n"
-        f"- Add your Artificial Analysis API key as AA_KEY in your process environment, or in {env_file}.\n"
-        "- Example line:\n"
-        "  AA_KEY=your_api_key_here\n"
-        "- Do not commit secrets to the repository.\n"
-        "- Then rerun the command. No API call was made."
+        "GoodEnoughLLMs needs an Artificial Analysis API key.\n\n"
+        "No AA_KEY was found in the environment or skill-local .env file.\n\n"
+        "Expected env file:\n"
+        f"  {env_file}\n\n"
+        "Create it with:\n"
+        "  cp .env.example .env\n\n"
+        "Then edit `.env` and replace:\n\n"
+        "  AA_KEY=your_artificial_analysis_api_key_here\n\n"
+        "with your real Artificial Analysis API key.\n\n"
+        "The skill did not call the Artificial Analysis API."
     )
 
 
@@ -212,7 +232,7 @@ def run_track(
         )
         return False
 
-    max_score = max(c["score"] for c in candidates)
+    max_score = max(candidate["score"] for candidate in candidates)
     threshold = max_score * threshold_ratio
     threshold_percent = int(threshold_ratio * 100)
 
@@ -256,9 +276,10 @@ def main(argv: list[str] | None = None) -> int:
         threshold_ratio = EFFORT_THRESHOLDS[effort]
         provider_filter = normalize_provider_filter(args.provider)
 
-        api_key = load_api_key()
+        env_file = skill_env_file_path()
+        api_key = load_api_key(env_file=env_file)
         if not api_key:
-            print(onboarding_message(global_env_file_path()), file=sys.stderr)
+            print(onboarding_message(env_file), file=sys.stderr)
             return 1
 
         models = fetch_models(api_key)
