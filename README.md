@@ -10,6 +10,22 @@ Use it by invoking the skill in a compatible client:
 /goodenoughllms --quality good
 ```
 
+## Installation with Hermes Agent
+
+GoodEnoughLLMs is currently developed and tested primarily for [Hermes Agent](https://hermes-agent.nousresearch.com). You can install it as a Hermes Agent skill directly from this GitHub repository:
+
+```bash
+hermes skills tap add https://github.com/arturites/GoodEnoughLLMs
+hermes skills check
+hermes skills update
+```
+
+Skill updates may only become active in a new chat or after `/reset`. If an update does not apply cleanly, remove the skill, add the repository source again, and reinstall the skill. For stable usage, pin the skill version whenever Hermes Agent supports skill pinning in your setup.
+
+### Compatibility
+
+`SKILL.md` is also supported by [OpenClaw](https://openclaw.ai), so GoodEnoughLLMs may work in OpenClaw or other `SKILL.md`-based agents. However, this project is currently only tested and maintained against the Hermes Agent workflow. Compatibility with OpenClaw is not officially guaranteed at the moment. 
+
 `SKILL.md` in the repository root is the authoritative usage guide.
 
 GoodEnoughLLMs looks for `AA_KEY` in this order:
