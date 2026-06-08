@@ -27,7 +27,10 @@ class AppError(Exception):
 
 
 def skill_root() -> Path:
-    return Path(__file__).resolve().parent
+    for candidate in Path(__file__).resolve().parents:
+        if (candidate / "SKILL.md").is_file():
+            return candidate
+    raise RuntimeError("Could not locate the GoodEnoughLLMs skill root.")
 
 
 def skill_env_file_path() -> Path:
@@ -44,12 +47,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  python3 scripts/goodenoughllms.py\n"
-            "  python3 scripts/goodenoughllms.py --quality basic\n"
-            "  python3 scripts/goodenoughllms.py --quality good\n"
-            "  python3 scripts/goodenoughllms.py --quality high\n"
-            "  python3 scripts/goodenoughllms.py --quality max\n"
-            "  python3 scripts/goodenoughllms.py --provider OpenAI\n\n"
+            "  python3 scripts/aa_top5.py\n"
+            "  python3 scripts/aa_top5.py --quality basic\n"
+            "  python3 scripts/aa_top5.py --quality good\n"
+            "  python3 scripts/aa_top5.py --quality high\n"
+            "  python3 scripts/aa_top5.py --quality max\n"
+            "  python3 scripts/aa_top5.py --provider OpenAI\n\n"
             "AA_KEY is read from the process environment first, then from the "
             "skill-local .env file next to SKILL.md."
         ),

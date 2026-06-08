@@ -8,7 +8,7 @@ compatibility: Requires Python 3.11+, network access to Artificial Analysis, and
 
 Use this skill to shortlist models from Artificial Analysis by value score.
 
-Primary invocation is `/goodenoughllms` in a compatible agent. For local debugging only, the repository includes a Python entry point at `scripts/goodenoughllms.py`.
+Primary invocation is `/goodenoughllms` in a compatible agent. For local debugging only, the repository includes a Python entry point at `scripts/aa_top5.py`.
 
 ## Use
 
@@ -33,7 +33,7 @@ Examples:
 Local debugging:
 
 ```bash
-python3 scripts/goodenoughllms.py --help
+python3 scripts/aa_top5.py --help
 ```
 
 ## Parameters

@@ -25,11 +25,11 @@ AA_KEY=your_artificial_analysis_api_key_here
 
 Copy it to `.env`, replace the placeholder with your real Artificial Analysis API key, and do not commit `.env`.
 
-Internally, the skill uses the existing Python implementation in `aa_top5.py`. For local debugging only, run:
+Internally, the skill uses the existing Python implementation in `scripts/aa_top5.py`. For local debugging only, run:
 
 ```bash
-python3 scripts/goodenoughllms.py --help
-python3 scripts/goodenoughllms.py --quality good
+python3 scripts/aa_top5.py --help
+python3 scripts/aa_top5.py --quality good
 ```
 
 Key facts:
