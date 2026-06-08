@@ -20,7 +20,13 @@ hermes skills check
 hermes skills update
 ```
 
-Skill updates may only become active in a new chat or after `/reset`. If an update does not apply cleanly, remove the skill, add the repository source again, and reinstall the skill. For stable usage, pin the skill version whenever Hermes Agent supports skill pinning in your setup.
+Skill updates may only become active in a new chat or after `/reset`. If an update does not apply cleanly, remove the skill, add the repository source again, and reinstall the skill. 
+
+For stable usage, pin the skill in your setup:
+
+```bash
+hermes curator pin <skillname>
+```
 
 ### Compatibility
 
