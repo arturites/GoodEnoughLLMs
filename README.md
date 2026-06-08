@@ -12,15 +12,9 @@ Use it by invoking the skill in a compatible client:
 
 ## Installation with Hermes Agent
 
-GoodEnoughLLMs is currently developed and tested primarily for [Hermes Agent](https://hermes-agent.nousresearch.com). You can install it as a Hermes Agent skill directly from this GitHub repository:
+GoodEnoughLLMs is currently developed and tested primarily for [Hermes Agent](https://hermes-agent.nousresearch.com). 
 
-```bash
-hermes skills tap add https://github.com/arturites/goodenoughllms-skill
-hermes skills check
-hermes skills update
-```
-
-Skill updates may only become active in a new chat or after `/reset`. If an update does not apply cleanly, remove the skill, add the repository source again, and reinstall the skill. 
+Just ask your Hermes Agent to install this skill. 
 
 For stable usage, pin the skill in your setup:
 
