@@ -14,17 +14,11 @@ from pathlib import Path
 
 API_URL = "https://artificialanalysis.ai/api/v2/data/llms/models"
 DATA_CREDIT = "Data provided by Artificial Analysis — https://artificialanalysis.ai/"
-EFFORT_THRESHOLDS = {
-    "low": 0.70,
-    "medium": 0.80,
+QUALITY_THRESHOLDS = {
+    "basic": 0.60,
+    "good": 0.80,
     "high": 0.90,
-    "xhigh": 0.99,
-}
-EFFORT_DISPLAY = {
-    "low": "Low",
-    "medium": "Medium",
-    "high": "High",
-    "xhigh": "XHigh",
+    "max": 0.99,
 }
 
 
@@ -51,17 +45,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         epilog=(
             "Examples:\n"
             "  python3 scripts/goodenoughllms.py\n"
-            "  python3 scripts/goodenoughllms.py --effort high\n"
+            "  python3 scripts/goodenoughllms.py --quality basic\n"
+            "  python3 scripts/goodenoughllms.py --quality good\n"
+            "  python3 scripts/goodenoughllms.py --quality high\n"
+            "  python3 scripts/goodenoughllms.py --quality max\n"
             "  python3 scripts/goodenoughllms.py --provider OpenAI\n\n"
             "AA_KEY is read from the process environment first, then from the "
             "skill-local .env file next to SKILL.md."
         ),
     )
     parser.add_argument(
-        "--effort",
-        choices=list(EFFORT_THRESHOLDS),
-        default="medium",
-        help="Task effort level used for the minimum score threshold. Default: medium.",
+        "--quality",
+        choices=list(QUALITY_THRESHOLDS),
+        default="good",
+        help=(
+            "Minimum quality level relative to the best available model in each track. "
+            "basic=60%%, good=80%%, high=90%%, max=99%%. Default: good."
+        ),
     )
     parser.add_argument(
         "--provider",
@@ -195,8 +195,9 @@ def onboarding_message(env_file: Path) -> str:
     )
 
 
-def render_session_header(effort: str) -> None:
-    print(f"GoodEnoughLLMs — {EFFORT_DISPLAY[effort]} Effort")
+def render_session_header(quality: str) -> None:
+    print("GoodEnoughLLMs")
+    print(f"Selected quality: {quality}")
     print()
 
 
@@ -210,7 +211,6 @@ def run_track(
     score_key: str,
     track_label: str,
     score_col_label: str,
-    effort: str,
     threshold_ratio: float,
     provider_filter: str | None = None,
 ) -> bool:
@@ -253,7 +253,7 @@ def run_track(
     threshold_percent = int(threshold_ratio * 100)
 
     print(f"{track_label} Track")
-    print(f"Threshold: {threshold_percent}%")
+    print(f"Quality threshold: {threshold_percent}%")
     if provider_filter:
         print(f"Provider filter: {provider_filter}")
     print(f"Maximum {score_col_label}: {max_score:.1f}")
@@ -281,8 +281,8 @@ def run_track(
 def main(argv: list[str] | None = None) -> int:
     try:
         args = parse_args(argv)
-        effort = args.effort
-        threshold_ratio = EFFORT_THRESHOLDS[effort]
+        quality = args.quality
+        threshold_ratio = QUALITY_THRESHOLDS[quality]
         provider_filter = normalize_provider_filter(args.provider)
 
         env_file = skill_env_file_path()
@@ -300,14 +300,13 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 1
 
-        render_session_header(effort)
+        render_session_header(quality)
 
         if not run_track(
             models,
             "artificial_analysis_intelligence_index",
             "Agentic",
             "Intel. Index",
-            effort,
             threshold_ratio,
             provider_filter,
         ):
@@ -318,7 +317,6 @@ def main(argv: list[str] | None = None) -> int:
             "artificial_analysis_coding_index",
             "Coding",
             "Coding Index",
-            effort,
             threshold_ratio,
             provider_filter,
         ):
