@@ -1,4 +1,4 @@
-# GoodEnoughLLMs
+# GoodEnoughLLMs Skill
 
 GoodEnoughLLMs is an Agent Skill for ranking Artificial Analysis model data by value score.
 The `quality` parameter sets the minimum acceptable model quality relative to the best available Intelligence Index or Coding Index in a track. It does not describe reasoning budget or thinking time.
