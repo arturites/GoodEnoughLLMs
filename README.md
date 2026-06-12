@@ -2,12 +2,14 @@
 
 GoodEnoughLLMs is an Agent Skill for ranking Artificial Analysis model data by value score.
 The `quality` parameter sets the minimum acceptable model quality relative to the best available Intelligence Index or Coding Index in a track. It does not describe reasoning budget or thinking time.
+By default, the Python entry point prints terminal tables. Use `--messenger` for a compact messenger-friendly layout.
 
 Use it by invoking the skill in a compatible client:
 
 ```text
 /goodenoughllms
 /goodenoughllms --quality good
+/goodenoughllms --messenger
 ```
 
 ## Installation with Hermes Agent
@@ -46,6 +48,7 @@ Internally, the skill uses the existing Python implementation in `scripts/aa_top
 ```bash
 python3 scripts/aa_top5.py --help
 python3 scripts/aa_top5.py --quality good
+python3 scripts/aa_top5.py --messenger
 ```
 
 Key facts:
@@ -54,6 +57,8 @@ Key facts:
 - Coding Track uses the Artificial Analysis Coding Index.
 - Quality levels: `basic`, `good`, `high`, `max`.
 - Optional provider filter matches `model_creator.name` case-insensitively.
+- Terminal output is the default and uses ASCII tables.
+- `--messenger` switches to a compact line-based layout for chat apps.
 - Output ends with the Artificial Analysis credit line.
 
 Quality levels:

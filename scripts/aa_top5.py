@@ -53,6 +53,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "  python3 scripts/aa_top5.py --quality high\n"
             "  python3 scripts/aa_top5.py --quality max\n"
             "  python3 scripts/aa_top5.py --provider OpenAI\n\n"
+            "  python3 scripts/aa_top5.py --messenger\n\n"
+            "  python3 scripts/aa_top5.py --quality high --messenger\n\n"
             "AA_KEY is read from the process environment first, then from the "
             "skill-local .env file next to SKILL.md."
         ),
@@ -69,6 +71,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--provider",
         help="Filter models by provider/creator name. Case-insensitive substring match.",
+    )
+    parser.add_argument(
+        "--messenger",
+        action="store_true",
+        help="Format output for messenger apps instead of terminal tables. Default: terminal tables.",
     )
     return parser.parse_args(argv)
 
@@ -209,6 +216,64 @@ def format_price(price: float) -> str:
     return f"${price_text}"
 
 
+def render_table(headers: list[str], rows: list[list[str]], alignments: list[str] | None = None) -> None:
+    if alignments is None:
+        alignments = ["left"] * len(headers)
+    if len(headers) != len(alignments):
+        raise ValueError("headers and alignments must have the same length.")
+
+    normalized_rows = [[str(cell) for cell in row] for row in rows]
+    widths = [len(header) for header in headers]
+    for row in normalized_rows:
+        for index, cell in enumerate(row):
+            widths[index] = max(widths[index], len(cell))
+
+    def render_cell(text: str, width: int, alignment: str) -> str:
+        if alignment == "right":
+            return text.rjust(width)
+        return text.ljust(width)
+
+    border = "+" + "+".join("-" * (width + 2) for width in widths) + "+"
+    print(border)
+    print(
+        "|"
+        + "|".join(
+            f" {render_cell(headers[index], widths[index], 'left')} "
+            for index in range(len(headers))
+        )
+        + "|"
+    )
+    print(border)
+    for row in normalized_rows:
+        print(
+            "|"
+            + "|".join(
+                f" {render_cell(row[index], widths[index], alignments[index])} "
+                for index in range(len(headers))
+            )
+            + "|"
+        )
+    print(border)
+
+
+def render_terminal_track_table(top5: list[dict[str, object]], score_col_label: str) -> None:
+    headers = ["#", "Model", "Creator", score_col_label, "Price/1M", "Value Score"]
+    rows = []
+    for index, model in enumerate(top5, 1):
+        rows.append(
+            [
+                str(index),
+                str(model["model"]),
+                str(model["creator"]),
+                f"{model['score']:.1f}",
+                format_price(model["price"]),
+                f"{model['value']:.1f}",
+            ]
+        )
+
+    render_table(headers, rows, ["right", "left", "left", "right", "right", "right"])
+
+
 def run_track(
     models: list[dict[str, object]],
     score_key: str,
@@ -216,6 +281,7 @@ def run_track(
     score_col_label: str,
     threshold_ratio: float,
     provider_filter: str | None = None,
+    messenger: bool = False,
 ) -> bool:
     candidates = []
     for model in models:
@@ -270,12 +336,16 @@ def run_track(
 
     top5 = sorted(scored, key=lambda item: item["value"], reverse=True)[:5]
 
-    for index, model in enumerate(top5, 1):
-        print(f"{index}. {model['model']}")
-        print(f"   Creator: {model['creator']}")
-        print(f"   {score_col_label}: {model['score']:.1f}")
-        print(f"   Price/1M: {format_price(model['price'])}")
-        print(f"   Value Score: {model['value']:.1f}")
+    if messenger:
+        for index, model in enumerate(top5, 1):
+            print(f"{index}. {model['model']}")
+            print(f"   Creator: {model['creator']}")
+            print(f"   {score_col_label}: {model['score']:.1f}")
+            print(f"   Price/1M: {format_price(model['price'])}")
+            print(f"   Value Score: {model['value']:.1f}")
+            print()
+    else:
+        render_terminal_track_table(top5, score_col_label)
         print()
 
     return True
@@ -312,6 +382,7 @@ def main(argv: list[str] | None = None) -> int:
             "Intel. Index",
             threshold_ratio,
             provider_filter,
+            messenger=args.messenger,
         ):
             return 1
 
@@ -322,6 +393,7 @@ def main(argv: list[str] | None = None) -> int:
             "Coding Index",
             threshold_ratio,
             provider_filter,
+            messenger=args.messenger,
         ):
             return 1
 

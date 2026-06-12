@@ -28,6 +28,8 @@ Examples:
 /goodenoughllms --quality max
 /goodenoughllms --quality high --provider OpenAI
 /goodenoughllms --provider Anthropic
+/goodenoughllms --messenger
+/goodenoughllms --quality high --messenger
 ```
 
 Local debugging:
@@ -40,6 +42,7 @@ python3 scripts/aa_top5.py --help
 
 - `--quality basic|good|high|max` sets the minimum quality threshold relative to the best available model in each track. Default: `good`.
 - `--provider <name>` filters models by `model_creator.name` using a case-insensitive substring match.
+- `--messenger` switches output from terminal tables to a compact messenger-friendly layout. Default: terminal tables.
 - `--help` prints usage and examples.
 
 ## Quality levels
@@ -67,6 +70,8 @@ Preserve the canonical GoodEnoughLLMs behavior:
 - Agentic Track
 - Coding Track
 - Quality-based threshold summary
+- Terminal mode: ASCII tables
+- Messenger mode: compact line-based output
 - Value Score = score / price
 - Sorted top 5 per track
 - Credit line: `Data provided by Artificial Analysis - https://artificialanalysis.ai/`
