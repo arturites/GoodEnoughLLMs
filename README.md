@@ -1,39 +1,40 @@
-# GoodEnoughLLMs Skill
+# GoodEnoughLLMs
 
-GoodEnoughLLMs is an Agent Skill for ranking Artificial Analysis model data by value score.
-The `quality` parameter sets the minimum acceptable model quality relative to the best available Intelligence Index or Coding Index in a track. It does not describe reasoning budget or thinking time.
-By default, the Python entry point prints terminal tables. Use `--messenger` for a compact messenger-friendly layout.
+GoodEnoughLLMs is a small CLI that fetches live Artificial Analysis model data and prints the top 5 cheapest models that are still good enough for the selected quality level.
 
-Use it by invoking the skill in a compatible client:
+It focuses on value, not on naming a single objectively best model.
 
-```text
-/goodenoughllms
-/goodenoughllms --quality good
-/goodenoughllms --messenger
-```
+Value Score means price-performance within the selected quality threshold. A model only competes after it clears the chosen threshold for its track.
 
-## Installation with Hermes Agent
+**What It Does**
 
-GoodEnoughLLMs is currently developed and tested primarily for [Hermes Agent](https://hermes-agent.nousresearch.com). 
+- Fetches model data from the Artificial Analysis API.
+- Ranks models separately for the Agentic Track and the Coding Track.
+- Filters to models that meet the chosen quality threshold.
+- Sorts the remaining models by value score: `score / price per 1M tokens`.
+- Prints human-readable ASCII tables by default.
+- Supports `--json` for machine-readable output.
 
-Just ask your Hermes Agent to install this skill. 
+**Installation**
 
-For stable usage, pin the skill in your setup:
+Requirements:
+
+- Python 3.11+
+- Network access to Artificial Analysis
+- An Artificial Analysis API key
+
+No packaging step is required. Run the root script directly:
 
 ```bash
-hermes curator pin goodenoughllms
+python3 goodenoughllms.py --help
 ```
 
-### Compatibility
-
-`SKILL.md` is also supported by [OpenClaw](https://openclaw.ai), so GoodEnoughLLMs may work in OpenClaw or other `SKILL.md`-based agents. However, this project is currently only tested and maintained against the Hermes Agent workflow. Compatibility with OpenClaw is not officially guaranteed at the moment. 
-
-`SKILL.md` in the repository root is the authoritative usage guide.
+**API Key Configuration**
 
 GoodEnoughLLMs looks for `AA_KEY` in this order:
 
 1. Process environment
-2. Skill-local `.env` in the repository root, next to `SKILL.md`
+2. `.env` in the repository root, next to `goodenoughllms.py`
 
 The repository includes `.env.example`:
 
@@ -41,31 +42,114 @@ The repository includes `.env.example`:
 AA_KEY=your_artificial_analysis_api_key_here
 ```
 
-Copy it to `.env`, replace the placeholder with your real Artificial Analysis API key, and do not commit `.env`.
-
-Internally, the skill uses the existing Python implementation in `scripts/aa_top5.py`. For local debugging only, run:
+Set it in your shell:
 
 ```bash
-python3 scripts/aa_top5.py --help
-python3 scripts/aa_top5.py --quality good
-python3 scripts/aa_top5.py --messenger
+export AA_KEY=your_artificial_analysis_api_key_here
 ```
 
-Key facts:
+Or create a local `.env` file:
 
-- Agentic Track uses the Artificial Analysis Intelligence Index.
-- Coding Track uses the Artificial Analysis Coding Index.
-- Quality levels: `basic`, `good`, `high`, `max`.
-- Optional provider filter matches `model_creator.name` case-insensitively.
-- Terminal output is the default and uses ASCII tables.
-- `--messenger` switches to a compact line-based layout for chat apps.
-- Output ends with the Artificial Analysis credit line.
+```bash
+cp .env.example .env
+```
 
-Quality levels:
+Do not commit `.env`.
 
-- `basic`: 60% of the best available model in the track. Good for simple tasks, everyday questions, very cheap models, and maximum cost savings.
-- `good`: 80% of the best available model in the track. The Pareto sweet spot and the default. "80% of the performance for a fraction of the cost." Good for most users and daily work.
-- `high`: 90% of the best available model in the track. Good for demanding tasks, architecture decisions, complex analysis, difficult coding, and higher-requirement agents.
-- `max`: 99% of the best available model in the track. Good for critical tasks, difficult agents, and maximum quality. "If only the best models are acceptable."
+**Usage**
+
+Show help:
+
+```bash
+python3 goodenoughllms.py --help
+```
+
+Show version:
+
+```bash
+python3 goodenoughllms.py --version
+```
+
+Use the default quality level (`good`):
+
+```bash
+python3 goodenoughllms.py
+```
+
+Choose a quality threshold:
+
+```bash
+python3 goodenoughllms.py --quality basic
+python3 goodenoughllms.py --quality good
+python3 goodenoughllms.py --quality high
+python3 goodenoughllms.py --quality max
+```
+
+Filter by provider name:
+
+```bash
+python3 goodenoughllms.py --provider OpenAI
+python3 goodenoughllms.py --provider anthropic
+python3 goodenoughllms.py --quality high --provider meta
+```
+
+`--provider` matches `model_creator.name` using a case-insensitive substring search.
+
+Get machine-readable output:
+
+```bash
+python3 goodenoughllms.py --json
+python3 goodenoughllms.py --quality high --provider OpenAI --json
+```
+
+Successful `--json` results are written to stdout. Errors are written as JSON to stderr.
+
+The CLI never prompts interactively.
+
+**Quality Levels**
+
+`quality` is a threshold relative to the best available model in each track. It is not a reasoning-budget knob.
+
+- `basic`: 60%
+- `good`: 80%
+- `high`: 90%
+- `max`: 99%
+
+Examples:
+
+- `basic` keeps very cheap models that still clear 60% of the best available score.
+- `good` is the default and keeps models at 80% or better.
+- `high` is for harder tasks where you want models closer to the top.
+- `max` keeps only models very close to the best available score.
+
+**Tracks**
+
+- Agentic Track: ranked by the Artificial Analysis Intelligence Index.
+- Coding Track: ranked by the Artificial Analysis Coding Index.
+
+The CLI always prints both tracks when usable data is available.
+
+**How Value Score Works**
+
+Value Score is not an "overall winner" score for the entire market.
+
+The flow is:
+
+1. Pick a track.
+2. Find the best available score in that track.
+3. Apply the selected quality threshold.
+4. Rank only the models that passed the threshold by `score / price`.
+
+This means the cheapest acceptable model can outrank a stronger but much more expensive model inside the same threshold window.
+
+**Exit Codes**
+
+- `0`: success
+- `2`: CLI usage error
+- `3`: missing `AA_KEY`
+- `4`: API, network, or response error
+- `5`: no matching or usable model data
+
+**Data Source**
 
 Data provided by Artificial Analysis - https://artificialanalysis.ai/
