@@ -5,17 +5,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import re
 import sys
-import urllib.error
-import urllib.request
 from pathlib import Path
+
+import requests
 
 
 APP_NAME = "GoodEnoughLLMs"
-VERSION = "1.0.0"
-API_URL = "https://artificialanalysis.ai/api/v2/data/llms/models"
+VERSION = "2.0.0"
+API_URL = "https://artificialanalysis.ai/api/v2/language/models/free"
 DATA_CREDIT = "Data provided by Artificial Analysis - https://artificialanalysis.ai/"
 TOP_N = 5
 QUALITY_THRESHOLDS = {
@@ -24,6 +25,52 @@ QUALITY_THRESHOLDS = {
     "high": 0.90,
     "max": 0.99,
 }
+TRACK_CONFIGS = (
+    {
+        "name": "Intelligence",
+        "score_key": "artificial_analysis_intelligence_index",
+        "score_label": "Intelligence Index",
+        "cost_label": "Cost/Task",
+        "value_method": "intelligence_index_cost_per_task",
+        "value_formula": (
+            "score / artificial_analysis_intelligence_index_cost.cost_per_task.total_cost"
+        ),
+        "value_description": "Index / reported Intelligence cost per benchmark task",
+        "effective_cost_type": "reported",
+        "effective_cost_unit": "USD per benchmark task",
+        "value_unit": "index points per USD of average benchmark-task cost",
+    },
+    {
+        "name": "Coding",
+        "score_key": "artificial_analysis_coding_index",
+        "score_label": "Coding Index",
+        "cost_label": "Estimated Coding Cost/1M",
+        "value_method": "coding_proxy_35_cache_35_input_30_output",
+        "value_formula": (
+            "score / (0.35 * cache_hit_price_1m + 0.35 * input_price_1m "
+            "+ 0.30 * output_price_1m)"
+        ),
+        "value_description": "Index / estimated Coding cost (35% cache, 35% input, 30% output)",
+        "effective_cost_type": "estimated",
+        "effective_cost_unit": "USD per 1M weighted tokens",
+        "value_unit": "index points per blended USD/1M tokens",
+    },
+    {
+        "name": "Agentic",
+        "score_key": "artificial_analysis_agentic_index",
+        "score_label": "Agentic Index",
+        "cost_label": "Estimated Agentic Cost/1M",
+        "value_method": "agentic_proxy_70_cache_20_input_10_output",
+        "value_formula": (
+            "score / (0.70 * cache_hit_price_1m + 0.20 * input_price_1m "
+            "+ 0.10 * output_price_1m)"
+        ),
+        "value_description": "Index / estimated Agentic cost (70% cache, 20% input, 10% output)",
+        "effective_cost_type": "estimated",
+        "effective_cost_unit": "USD per 1M weighted tokens",
+        "value_unit": "index points per blended USD/1M tokens",
+    },
+)
 
 EXIT_OK = 0
 EXIT_INTERNAL = 1
@@ -68,7 +115,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = CliArgumentParser(
         json_errors="--json" in active_argv,
         prog="goodenoughllms.py",
-        description="Find the cheapest good-enough LLMs from Artificial Analysis data.",
+        description="Find the best-value good-enough LLMs from Artificial Analysis data.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
@@ -150,44 +197,99 @@ def load_api_key(env: dict[str, str] | os._Environ[str] | None = None, env_file:
     return None
 
 
-def fetch_models(api_key: str) -> list[dict[str, object]]:
-    request = urllib.request.Request(API_URL, headers={"x-api-key": api_key})
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            payload = response.read().decode("utf-8")
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", "replace").strip()
-        detail = ""
-        if body:
-            try:
-                parsed = json.loads(body)
-            except json.JSONDecodeError:
-                parsed = None
-            if isinstance(parsed, dict):
-                for key in ("error", "message", "detail", "description"):
-                    if parsed.get(key):
-                        detail = str(parsed[key])
-                        break
-            if not detail:
-                detail = body
-            if len(detail) > 400:
-                detail = detail[:397] + "..."
-        if detail:
-            raise AppError(f"API request failed with HTTP {exc.code}: {detail}", EXIT_API) from exc
-        raise AppError(f"API request failed with HTTP {exc.code}.", EXIT_API) from exc
-    except urllib.error.URLError as exc:
-        raise AppError(f"API request failed: {exc.reason}.", EXIT_API) from exc
+def response_error_detail(response: requests.Response) -> str:
+    body = response.text.strip()
+    if not body:
+        return ""
 
     try:
-        data = json.loads(payload)
-    except json.JSONDecodeError as exc:
-        raise AppError(f"API response was not valid JSON: {exc.msg}.", EXIT_API) from exc
+        parsed = response.json()
+    except ValueError:
+        parsed = None
 
-    models = data.get("data")
-    if not isinstance(models, list):
-        raise AppError("API response did not contain a top-level 'data' list.", EXIT_API)
+    detail = ""
+    if isinstance(parsed, dict):
+        for key in ("error", "message", "detail", "description"):
+            if parsed.get(key):
+                detail = str(parsed[key])
+                break
+    if not detail:
+        detail = body
+    if len(detail) > 400:
+        detail = detail[:397] + "..."
+    return detail
 
-    return models
+
+def fetch_models(api_key: str) -> tuple[list[dict[str, object]], object]:
+    models: list[dict[str, object]] = []
+    page = 1
+    expected_total_pages: int | None = None
+    intelligence_index_version: object = None
+
+    while True:
+        try:
+            response = requests.get(
+                API_URL,
+                headers={"x-api-key": api_key},
+                params={"page": page},
+                timeout=30,
+            )
+        except requests.RequestException as exc:
+            raise AppError(f"API request failed: {exc}", EXIT_API) from exc
+
+        if not 200 <= response.status_code < 300:
+            detail = response_error_detail(response)
+            if detail:
+                raise AppError(
+                    f"API request failed with HTTP {response.status_code}: {detail}",
+                    EXIT_API,
+                )
+            raise AppError(f"API request failed with HTTP {response.status_code}.", EXIT_API)
+
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise AppError(f"API response was not valid JSON: {exc}.", EXIT_API) from exc
+
+        if not isinstance(data, dict):
+            raise AppError("API response was not a JSON object.", EXIT_API)
+
+        page_models = data.get("data")
+        if not isinstance(page_models, list):
+            raise AppError("API response did not contain a top-level 'data' list.", EXIT_API)
+        if not all(isinstance(model, dict) for model in page_models):
+            raise AppError("API response 'data' contained an invalid model entry.", EXIT_API)
+        models.extend(page_models)
+
+        page_version = data.get("intelligence_index_version")
+        if page == 1:
+            intelligence_index_version = page_version
+        elif page_version != intelligence_index_version:
+            raise AppError("API response changed Intelligence Index version between pages.", EXIT_API)
+
+        pagination = data.get("pagination")
+        if not isinstance(pagination, dict):
+            raise AppError("API response did not contain pagination metadata.", EXIT_API)
+        has_more = pagination.get("has_more")
+        if not isinstance(has_more, bool):
+            raise AppError("API response pagination did not contain a boolean 'has_more'.", EXIT_API)
+        response_page = pagination.get("page")
+        total_pages = pagination.get("total_pages")
+        if isinstance(response_page, bool) or not isinstance(response_page, int) or response_page != page:
+            raise AppError("API response pagination returned an unexpected page number.", EXIT_API)
+        if isinstance(total_pages, bool) or not isinstance(total_pages, int) or total_pages < 1:
+            raise AppError("API response pagination returned an invalid total page count.", EXIT_API)
+        if expected_total_pages is None:
+            expected_total_pages = total_pages
+        elif total_pages != expected_total_pages:
+            raise AppError("API response pagination changed the total page count between pages.", EXIT_API)
+        if has_more != (page < total_pages):
+            raise AppError("API response pagination metadata was inconsistent.", EXIT_API)
+        if not has_more:
+            break
+        page += 1
+
+    return models, intelligence_index_version
 
 
 def normalize_provider_filter(provider: str | None) -> str | None:
@@ -235,6 +337,81 @@ def format_price(price: float) -> str:
     return f"${price_text}"
 
 
+def finite_number(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number):
+        return None
+    return number
+
+
+def token_prices_for_model(model: dict[str, object]) -> tuple[dict[str, float], bool] | None:
+    pricing_data = model.get("pricing")
+    if not isinstance(pricing_data, dict):
+        return None
+
+    input_price = finite_number(pricing_data.get("price_1m_input_tokens"))
+    output_price = finite_number(pricing_data.get("price_1m_output_tokens"))
+    if input_price is None or output_price is None or input_price < 0 or output_price < 0:
+        return None
+
+    raw_cache_price = pricing_data.get("price_1m_cache_hit_tokens")
+    cache_price_fallback = raw_cache_price is None
+    if cache_price_fallback:
+        cache_price = input_price
+    else:
+        cache_price = finite_number(raw_cache_price)
+        if cache_price is None or cache_price < 0:
+            return None
+
+    return (
+        {
+            "input_price_1m": input_price,
+            "output_price_1m": output_price,
+            "cache_hit_price_1m": cache_price,
+        },
+        cache_price_fallback,
+    )
+
+
+def effective_cost_for_model(model: dict[str, object], value_method: str) -> tuple[float | None, bool]:
+    if value_method == "intelligence_index_cost_per_task":
+        cost_data = model.get("artificial_analysis_intelligence_index_cost")
+        if not isinstance(cost_data, dict):
+            return None, False
+        cost_per_task_data = cost_data.get("cost_per_task")
+        if not isinstance(cost_per_task_data, dict):
+            return None, False
+        cost = finite_number(cost_per_task_data.get("total_cost"))
+        if cost is None or cost <= 0:
+            return None, False
+        return cost, False
+
+    price_result = token_prices_for_model(model)
+    if price_result is None:
+        return None, False
+    token_prices, cache_price_fallback = price_result
+    input_price = token_prices["input_price_1m"]
+    output_price = token_prices["output_price_1m"]
+    cache_price = token_prices["cache_hit_price_1m"]
+
+    if value_method == "agentic_proxy_70_cache_20_input_10_output":
+        cost = 0.70 * cache_price + 0.20 * input_price + 0.10 * output_price
+    elif value_method == "coding_proxy_35_cache_35_input_30_output":
+        cost = 0.35 * cache_price + 0.35 * input_price + 0.30 * output_price
+    else:
+        raise ValueError(f"Unknown value method: {value_method}")
+
+    cost = round(cost, 10)
+    if not math.isfinite(cost) or cost <= 0:
+        return None, cache_price_fallback
+    return cost, cache_price_fallback
+
+
 def render_table(headers: list[str], rows: list[list[str]], alignments: list[str] | None = None) -> None:
     if alignments is None:
         alignments = ["left"] * len(headers)
@@ -275,28 +452,37 @@ def render_table(headers: list[str], rows: list[list[str]], alignments: list[str
     print(border)
 
 
+def track_metadata(track_config: dict[str, str], threshold_ratio: float) -> dict[str, object]:
+    return {
+        "name": track_config["name"],
+        "score_key": track_config["score_key"],
+        "score_label": track_config["score_label"],
+        "cost_label": track_config["cost_label"],
+        "value_method": track_config["value_method"],
+        "value_formula": track_config["value_formula"],
+        "value_description": track_config["value_description"],
+        "effective_cost_type": track_config["effective_cost_type"],
+        "effective_cost_unit": track_config["effective_cost_unit"],
+        "value_unit": track_config["value_unit"],
+        "quality_threshold_ratio": threshold_ratio,
+        "quality_threshold_percent": int(threshold_ratio * 100),
+    }
+
+
 def build_track_result(
     models: list[dict[str, object]],
-    score_key: str,
-    track_name: str,
-    score_label: str,
+    track_config: dict[str, str],
     threshold_ratio: float,
 ) -> dict[str, object]:
+    score_key = track_config["score_key"]
+    track_name = track_config["name"]
     candidates = []
     for model in models:
         evaluations_data = model.get("evaluations")
-        pricing_data = model.get("pricing")
         creator_data = model.get("model_creator")
         evaluations = evaluations_data if isinstance(evaluations_data, dict) else {}
-        pricing = pricing_data if isinstance(pricing_data, dict) else {}
-
-        try:
-            score = float(evaluations.get(score_key))
-            price = float(pricing.get("price_1m_blended_3_to_1"))
-        except (TypeError, ValueError):
-            continue
-
-        if price <= 0:
+        score = finite_number(evaluations.get(score_key))
+        if score is None or score < 0:
             continue
 
         candidates.append(
@@ -304,33 +490,63 @@ def build_track_result(
                 "name": str(model.get("name", "")),
                 "creator": creator_data.get("name", "") if isinstance(creator_data, dict) else "",
                 "score": score,
-                "price_1m": price,
+                "model": model,
             }
         )
 
     if not candidates:
         raise AppError(
-            f"No models contained both {score_key} and price data for the {track_name} track.",
+            f"No models contained a valid {score_key} score for the {track_name} track.",
             EXIT_NO_RESULTS,
         )
 
     max_score = max(candidate["score"] for candidate in candidates)
+    if max_score <= 0:
+        raise AppError(f"The maximum score for the {track_name} track was not positive.", EXIT_NO_RESULTS)
     threshold = max_score * threshold_ratio
     scored = []
     for candidate in candidates:
         if candidate["score"] < threshold:
             continue
-        scored.append({**candidate, "value_score": candidate["score"] / candidate["price_1m"]})
+        effective_cost, cache_price_fallback = effective_cost_for_model(
+            candidate["model"],
+            track_config["value_method"],
+        )
+        if effective_cost is None:
+            continue
+        token_prices = {}
+        if track_config["value_method"] != "intelligence_index_cost_per_task":
+            price_result = token_prices_for_model(candidate["model"])
+            if price_result is None:
+                continue
+            token_prices, cache_price_fallback = price_result
+        value_score = candidate["score"] / effective_cost
+        if not math.isfinite(value_score):
+            continue
+        scored.append(
+            {
+                **candidate,
+                "effective_cost": effective_cost,
+                "value_score": value_score,
+                "cache_price_fallback": cache_price_fallback,
+                "token_prices": token_prices,
+            }
+        )
 
     if not scored:
         raise AppError(
-            f"No models met the selected quality threshold for the {track_name} track.",
+            f"No models met the selected quality threshold with usable cost data for the {track_name} track.",
             EXIT_NO_RESULTS,
         )
 
     top_models = sorted(
         scored,
-        key=lambda item: (-item["value_score"], -item["score"], item["price_1m"], item["name"]),
+        key=lambda item: (
+            -item["value_score"],
+            -item["score"],
+            item["effective_cost"],
+            item["name"],
+        ),
     )[:TOP_N]
 
     models_output = []
@@ -341,20 +557,34 @@ def build_track_result(
                 "name": model["name"],
                 "creator": model["creator"],
                 "score": model["score"],
-                "price_1m": model["price_1m"],
+                **model["token_prices"],
+                "effective_cost": model["effective_cost"],
                 "value_score": model["value_score"],
+                "cache_price_fallback": model["cache_price_fallback"],
             }
         )
 
     return {
-        "name": track_name,
-        "score_key": score_key,
-        "score_label": score_label,
-        "quality_threshold_ratio": threshold_ratio,
-        "quality_threshold_percent": int(threshold_ratio * 100),
+        **track_metadata(track_config, threshold_ratio),
+        "status": "ok",
         "max_score": max_score,
         "min_score_threshold": threshold,
         "models": models_output,
+    }
+
+
+def unavailable_track_result(
+    track_config: dict[str, str],
+    threshold_ratio: float,
+    message: str,
+) -> dict[str, object]:
+    return {
+        **track_metadata(track_config, threshold_ratio),
+        "status": "unavailable",
+        "error": message,
+        "max_score": None,
+        "min_score_threshold": None,
+        "models": [],
     }
 
 
@@ -365,31 +595,27 @@ def build_result(quality: str, provider_filter: str | None) -> dict[str, object]
     if not api_key:
         raise AppError(onboarding_message(env_file), EXIT_CONFIG)
 
-    models = fetch_models(api_key)
+    models, intelligence_index_version = fetch_models(api_key)
     models = filter_models_by_provider(models, provider_filter)
     if provider_filter and not models:
         raise AppError(f"No models found for provider filter '{provider_filter}'.", EXIT_NO_RESULTS)
 
-    tracks = [
-        build_track_result(
-            models,
-            "artificial_analysis_intelligence_index",
-            "Agentic",
-            "Intel. Index",
-            threshold_ratio,
-        ),
-        build_track_result(
-            models,
-            "artificial_analysis_coding_index",
-            "Coding",
-            "Coding Index",
-            threshold_ratio,
-        ),
-    ]
+    tracks = []
+    for track_config in TRACK_CONFIGS:
+        try:
+            tracks.append(build_track_result(models, track_config, threshold_ratio))
+        except AppError as exc:
+            if exc.exit_code != EXIT_NO_RESULTS:
+                raise
+            tracks.append(unavailable_track_result(track_config, threshold_ratio, str(exc)))
+
+    if not any(track.get("status") == "ok" for track in tracks):
+        raise AppError("No tracks contained usable model and cost data.", EXIT_NO_RESULTS)
 
     return {
         "tool": APP_NAME,
         "version": VERSION,
+        "intelligence_index_version": intelligence_index_version,
         "selected_quality": quality,
         "quality_threshold_ratio": threshold_ratio,
         "quality_threshold_percent": int(threshold_ratio * 100),
@@ -402,6 +628,9 @@ def build_result(quality: str, provider_filter: str | None) -> dict[str, object]
 def render_human_output(result: dict[str, object]) -> None:
     print(APP_NAME)
     print(f"Selected quality: {result['selected_quality']}")
+    intelligence_index_version = result.get("intelligence_index_version")
+    if intelligence_index_version is not None:
+        print(f"Intelligence Index version: v{intelligence_index_version}")
     provider_filter = result.get("provider_filter")
     if provider_filter:
         print(f"Provider filter: {provider_filter}")
@@ -413,36 +642,60 @@ def render_human_output(result: dict[str, object]) -> None:
             continue
 
         print(f"{track['name']} Track")
+        if track.get("status") != "ok":
+            print(f"Unavailable: {track.get('error', 'No usable data.')}")
+            print()
+            continue
         print(f"Quality threshold: {track['quality_threshold_percent']}%")
         print(f"Maximum {track['score_label']}: {track['max_score']:.1f}")
         print(f"Minimum {track['score_label']} threshold: {track['min_score_threshold']:.1f}")
+        print(f"Value basis: {track['value_description']}")
         print()
 
         rows = []
+        show_token_prices = track["value_method"] != "intelligence_index_cost_per_task"
+        used_cache_fallback = False
         for model in track.get("models", []):
-            rows.append(
-                [
-                    str(model["rank"]),
-                    str(model["name"]),
-                    str(model["creator"]),
-                    f"{model['score']:.1f}",
-                    format_price(model["price_1m"]),
-                    f"{model['value_score']:.1f}",
-                ]
-            )
+            cache_price_fallback = bool(model.get("cache_price_fallback"))
+            used_cache_fallback = used_cache_fallback or cache_price_fallback
+            effective_cost = format_price(model["effective_cost"])
+            row = [
+                str(model["rank"]),
+                str(model["name"]),
+                str(model["creator"]),
+                f"{model['score']:.1f}",
+            ]
+            if show_token_prices:
+                cache_price = format_price(model["cache_hit_price_1m"])
+                if cache_price_fallback:
+                    cache_price += "*"
+                row.extend(
+                    [
+                        format_price(model["input_price_1m"]),
+                        format_price(model["output_price_1m"]),
+                        cache_price,
+                    ]
+                )
+            row.extend([effective_cost, f"{model['value_score']:.1f}"])
+            rows.append(row)
 
-        render_table(
-            ["#", "Model", "Creator", str(track["score_label"]), "Price/1M", "Value Score"],
-            rows,
-            ["right", "left", "left", "right", "right", "right"],
-        )
+        headers = ["#", "Model", "Creator", str(track["score_label"])]
+        alignments = ["right", "left", "left", "right"]
+        if show_token_prices:
+            headers.extend(["Input/1M", "Output/1M", "Cache/1M"])
+            alignments.extend(["right", "right", "right"])
+        headers.extend([str(track["cost_label"]), "Value Score"])
+        alignments.extend(["right", "right"])
+        render_table(headers, rows, alignments)
+        if used_cache_fallback:
+            print("* Cache-Hit price unavailable; input price used for the cache component.")
         print()
 
     print(DATA_CREDIT)
 
 
 def render_json_output(result: dict[str, object]) -> None:
-    print(json.dumps(result, indent=2))
+    print(json.dumps(result, indent=2, allow_nan=False))
 
 
 def emit_error(message: str, exit_code: int, json_output: bool) -> None:
