@@ -4,18 +4,24 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import math
 import os
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 import requests
 
 
 APP_NAME = "GoodEnoughLLMs"
-VERSION = "2.0.0"
+VERSION = "2.1.0"
+CONFIG_DIR_NAME = ".goodenoughllms"
+ENV_FILE_NAME = ".env"
+API_KEY_PLACEHOLDER = "your_artificial_analysis_api_key_here"
+DEFAULT_ENV_CONTENT = "# GoodEnoughLLMs API key\nAA_KEY=\n"
 API_URL = "https://artificialanalysis.ai/api/v2/language/models/free"
 DATA_CREDIT = "Data provided by Artificial Analysis - https://artificialanalysis.ai/"
 TOP_N = 5
@@ -106,25 +112,58 @@ def project_root() -> Path:
     return Path(__file__).resolve().parent
 
 
+def user_config_directory(home: Path | None = None) -> Path:
+    base_directory = Path.home() if home is None else home
+    return base_directory / CONFIG_DIR_NAME
+
+
 def env_file_path() -> Path:
-    return project_root() / ".env"
+    return user_config_directory() / ENV_FILE_NAME
+
+
+def legacy_env_file_path() -> Path:
+    return project_root() / ENV_FILE_NAME
+
+
+def ensure_user_env_file(env_file: Path) -> None:
+    try:
+        env_file.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if env_file.exists():
+            return
+
+        file_descriptor = os.open(
+            env_file,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+        )
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as handle:
+            handle.write(DEFAULT_ENV_CONTENT)
+    except FileExistsError:
+        return
+    except OSError as exc:
+        raise AppError(
+            f"Could not create the configuration file {env_file}: {exc}",
+            EXIT_CONFIG,
+        ) from exc
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     active_argv = sys.argv[1:] if argv is None else argv
+    program_name = Path(sys.argv[0]).name or "gelm"
     parser = CliArgumentParser(
         json_errors="--json" in active_argv,
-        prog="goodenoughllms.py",
+        prog=program_name,
         description="Find the best-value good-enough LLMs from Artificial Analysis data.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  python3 goodenoughllms.py\n"
-            "  python3 goodenoughllms.py --quality basic\n"
-            "  python3 goodenoughllms.py --quality high --provider OpenAI\n"
-            "  python3 goodenoughllms.py --json\n\n"
-            "AA_KEY is read from the process environment first, then from the\n"
-            ".env file next to goodenoughllms.py."
+            "  gelm\n"
+            "  gelm --quality basic\n"
+            "  gelm --quality high --provider OpenAI\n"
+            "  gelm --json\n\n"
+            "AA_KEY is read from the process environment first, then from\n"
+            "~/.goodenoughllms/.env. In an interactive terminal, gelm asks\n"
+            "for a missing key and stores it in that file."
         ),
     )
     parser.add_argument(
@@ -182,19 +221,110 @@ def read_api_key_from_env_file(env_file: Path) -> str | None:
     return None
 
 
-def load_api_key(env: dict[str, str] | os._Environ[str] | None = None, env_file: Path | None = None) -> str | None:
+def usable_api_key(value: str | None) -> str | None:
+    if value is None:
+        return None
+
+    normalized = value.strip()
+    if not normalized or normalized == API_KEY_PLACEHOLDER:
+        return None
+    return normalized
+
+
+def load_api_key(
+    env: dict[str, str] | os._Environ[str] | None = None,
+    env_file: Path | None = None,
+    legacy_env_file: Path | None = None,
+) -> str | None:
     active_env = os.environ if env is None else env
     candidate_file = env_file_path() if env_file is None else env_file
 
-    api_key = active_env.get("AA_KEY", "").strip()
+    api_key = usable_api_key(active_env.get("AA_KEY"))
     if api_key:
         return api_key
 
-    api_key = read_api_key_from_env_file(candidate_file)
-    if api_key:
-        return api_key
+    files_to_check = [candidate_file]
+    fallback_file = legacy_env_file_path() if legacy_env_file is None else legacy_env_file
+    if fallback_file != candidate_file:
+        files_to_check.append(fallback_file)
+
+    for file_path in files_to_check:
+        api_key = usable_api_key(read_api_key_from_env_file(file_path))
+        if api_key:
+            return api_key
 
     return None
+
+
+def write_api_key_to_env_file(env_file: Path, api_key: str) -> None:
+    normalized = usable_api_key(api_key)
+    if normalized is None:
+        raise AppError("The API key cannot be empty.", EXIT_CONFIG)
+    if "\n" in normalized or "\r" in normalized:
+        raise AppError("The API key cannot contain line breaks.", EXIT_CONFIG)
+
+    ensure_user_env_file(env_file)
+    temporary_path: Path | None = None
+    try:
+        content = env_file.read_text(encoding="utf-8")
+        lines = content.splitlines(keepends=True)
+        assignment_re = re.compile(r"^\s*(?:export\s+)?AA_KEY=")
+        replaced = False
+        for index, line in enumerate(lines):
+            line_without_newline = line.rstrip("\r\n")
+            if assignment_re.match(line_without_newline):
+                newline = "\r\n" if line.endswith("\r\n") else "\n"
+                lines[index] = f"AA_KEY={normalized}{newline}"
+                replaced = True
+                break
+
+        if replaced:
+            updated_content = "".join(lines)
+        else:
+            separator = "" if not content or content.endswith(("\n", "\r")) else "\n"
+            updated_content = f"{content}{separator}AA_KEY={normalized}\n"
+
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=env_file.parent,
+            prefix=f".{env_file.name}.",
+            delete=False,
+        ) as temporary_file:
+            temporary_path = Path(temporary_file.name)
+            temporary_file.write(updated_content)
+            temporary_file.flush()
+            os.fsync(temporary_file.fileno())
+
+        os.chmod(temporary_path, 0o600)
+        os.replace(temporary_path, env_file)
+    except OSError as exc:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+        raise AppError(
+            f"Could not save the API key to {env_file}: {exc}",
+            EXIT_CONFIG,
+        ) from exc
+
+
+def prompt_for_api_key(env_file: Path) -> str | None:
+    if not sys.stdin.isatty():
+        return None
+
+    try:
+        entered_key = getpass.getpass(
+            f"Enter your Artificial Analysis API key (stored in {env_file}): "
+        )
+    except (EOFError, KeyboardInterrupt, OSError):
+        print(file=sys.stderr)
+        return None
+
+    api_key = usable_api_key(entered_key)
+    if api_key is None:
+        return None
+
+    write_api_key_to_env_file(env_file, api_key)
+    return api_key
 
 
 def response_error_detail(response: requests.Response) -> str:
@@ -321,15 +451,27 @@ def filter_models_by_provider(models: list[dict[str, object]], provider_filter: 
 def onboarding_message(env_file: Path) -> str:
     return (
         f"{APP_NAME} needs an Artificial Analysis API key.\n\n"
-        "No AA_KEY was found in the environment or in the local .env file.\n\n"
-        "Set AA_KEY in your shell, or create:\n"
+        "No usable AA_KEY was found in the environment or in a .env file.\n\n"
+        "Set AA_KEY in your shell, or run gelm in an interactive terminal\n"
+        "to enter it securely. The key will be stored in:\n"
         f"  {env_file}\n\n"
-        "with:\n"
+        "Example file content:\n"
         "  AA_KEY=your_artificial_analysis_api_key_here\n\n"
-        "You can start from:\n"
-        "  cp .env.example .env\n\n"
         "The CLI did not call the Artificial Analysis API."
     )
+
+
+def resolve_api_key(env_file: Path, *, interactive: bool) -> str:
+    api_key = load_api_key(env_file=env_file)
+    if api_key:
+        return api_key
+
+    if interactive:
+        api_key = prompt_for_api_key(env_file)
+        if api_key:
+            return api_key
+
+    raise AppError(onboarding_message(env_file), EXIT_CONFIG)
 
 
 def format_price(price: float) -> str:
@@ -588,12 +730,16 @@ def unavailable_track_result(
     }
 
 
-def build_result(quality: str, provider_filter: str | None) -> dict[str, object]:
+def build_result(
+    quality: str,
+    provider_filter: str | None,
+    *,
+    interactive: bool = False,
+) -> dict[str, object]:
     threshold_ratio = QUALITY_THRESHOLDS[quality]
     env_file = env_file_path()
-    api_key = load_api_key(env_file=env_file)
-    if not api_key:
-        raise AppError(onboarding_message(env_file), EXIT_CONFIG)
+    ensure_user_env_file(env_file)
+    api_key = resolve_api_key(env_file, interactive=interactive)
 
     models, intelligence_index_version = fetch_models(api_key)
     models = filter_models_by_provider(models, provider_filter)
@@ -712,7 +858,11 @@ def main(argv: list[str] | None = None) -> int:
         args = parse_args(argv)
         json_output = args.json
         provider_filter = normalize_provider_filter(args.provider)
-        result = build_result(args.quality, provider_filter)
+        result = build_result(
+            args.quality,
+            provider_filter,
+            interactive=not json_output and sys.stdin.isatty(),
+        )
         if json_output:
             render_json_output(result)
         else:

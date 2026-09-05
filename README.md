@@ -22,20 +22,27 @@ Value Score means price-performance within the selected quality threshold. A mod
 Requirements:
 
 - Python 3.11+
-- [`requests`](https://requests.readthedocs.io/)
+- [pipx](https://pipx.pypa.io/)
 - Network access to Artificial Analysis
 - An Artificial Analysis API key
 
-Install the runtime dependency in your active Python environment:
+Install the latest project version directly from GitHub with pipx:
 
 ```bash
-python3 -m pip install requests
+pipx install git+https://github.com/arturites/GoodEnoughLLMs.git
+gelm --version
 ```
 
-No packaging step is required. Run the root script directly:
+If the `pipx` command is not available yet, install pipx for your operating system and run `pipx ensurepath` as described in the pipx documentation. Direct source-tree execution remains available:
 
 ```bash
 python3 goodenoughllms.py --help
+```
+
+When working from a local checkout, install that checkout with:
+
+```bash
+pipx install .
 ```
 
 **API Key Configuration**
@@ -43,63 +50,60 @@ python3 goodenoughllms.py --help
 GoodEnoughLLMs looks for `AA_KEY` in this order:
 
 1. Process environment
-2. `.env` in the repository root, next to `goodenoughllms.py`
+2. `~/.goodenoughllms/.env`
+3. `.env` in the repository root, next to `goodenoughllms.py`, when running directly from the source tree
 
-The repository includes `.env.example`:
+On the first normal `gelm` invocation, GoodEnoughLLMs creates `~/.goodenoughllms/.env` if necessary and asks for the API key with hidden input. The entered key is stored there for later invocations. Existing files and keys are preserved.
 
-```text
-AA_KEY=your_artificial_analysis_api_key_here
-```
-
-Set it in your shell:
+For non-interactive use, set the key in the process environment:
 
 ```bash
 export AA_KEY=your_artificial_analysis_api_key_here
 ```
 
-Or create a local `.env` file:
+The repository also includes `.env.example` for direct source-tree development:
 
 ```bash
 cp .env.example .env
 ```
 
-Do not commit `.env`.
+Do not commit `.env`. It is excluded from built packages.
 
 **Usage**
 
 Show help:
 
 ```bash
-python3 goodenoughllms.py --help
+gelm --help
 ```
 
 Show version:
 
 ```bash
-python3 goodenoughllms.py --version
+gelm --version
 ```
 
 Use the default quality level (`good`):
 
 ```bash
-python3 goodenoughllms.py
+gelm
 ```
 
 Choose a quality threshold:
 
 ```bash
-python3 goodenoughllms.py --quality basic
-python3 goodenoughllms.py --quality good
-python3 goodenoughllms.py --quality high
-python3 goodenoughllms.py --quality max
+gelm --quality basic
+gelm --quality good
+gelm --quality high
+gelm --quality max
 ```
 
 Filter by provider name:
 
 ```bash
-python3 goodenoughllms.py --provider OpenAI
-python3 goodenoughllms.py --provider anthropic
-python3 goodenoughllms.py --quality high --provider meta
+gelm --provider OpenAI
+gelm --provider anthropic
+gelm --quality high --provider meta
 ```
 
 `--provider` matches `model_creator.name` using a case-insensitive substring search.
@@ -107,18 +111,18 @@ python3 goodenoughllms.py --quality high --provider meta
 Get machine-readable output:
 
 ```bash
-python3 goodenoughllms.py --json
-python3 goodenoughllms.py --quality high --provider OpenAI --json
+gelm --json
+gelm --quality high --provider OpenAI --json
 ```
 
 Successful `--json` results are written to stdout. Errors are written as JSON to stderr.
 
-The CLI never prompts interactively.
+When `gelm --json` or another non-interactive invocation has no key, it exits with code `3` and does not prompt.
 
-GoodEnoughLLMs 2.0 reports its version as `2.0.0`:
+GoodEnoughLLMs reports its version as `2.1.0`:
 
 ```text
-goodenoughllms.py 2.0.0
+gelm 2.1.0
 ```
 
 **Quality Levels**
@@ -215,7 +219,7 @@ The CLI uses `requests` to call:
 https://artificialanalysis.ai/api/v2/language/models/free
 ```
 
-It follows the response's `pagination.has_more` flag and requests subsequent pages until all model data has been combined. HTTP, network, and invalid-JSON failures use exit code `4`. When `AA_KEY` is missing, the CLI prints onboarding information to stderr, exits with code `3`, and does not call the API.
+It follows the response's `pagination.has_more` flag and requests subsequent pages until all model data has been combined. HTTP, network, and invalid-JSON failures use exit code `4`. When `AA_KEY` is missing, an interactive invocation asks for it before calling the API; non-interactive invocations print onboarding information to stderr, exit with code `3`, and do not call the API.
 
 **JSON Output**
 

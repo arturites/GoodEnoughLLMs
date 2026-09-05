@@ -1,0 +1,3 @@
+include CHANGELOG.md
+exclude .env
+global-exclude .env
