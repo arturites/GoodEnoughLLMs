@@ -6,6 +6,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- Derive the `basic`, `good`, `high`, and `max` quality thresholds from the average and best index scores in each track instead of fixed percentage thresholds.
+- Report the average score and selected absolute threshold for each track in human-readable and JSON output.
+
 ## [2.1.0] - 2026-09-05
 
 ### Added

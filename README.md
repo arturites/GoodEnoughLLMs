@@ -127,19 +127,16 @@ gelm 2.1.0
 
 **Quality Levels**
 
-`quality` is a threshold relative to the best valid index score in each track. It is not a reasoning-budget knob. The maximum score and resulting threshold are determined before models without a usable track-specific cost basis are removed from the Value ranking.
+`quality` is a threshold derived independently for each track from all valid index scores. The scores are collected after applying an optional provider filter and before models without usable track-specific cost data are removed from the Value ranking. It is not a reasoning-budget knob.
 
-- `basic`: 60%
-- `good`: 80%
-- `high`: 90%
-- `max`: 99%
+Let `μ` be the average index score and `M` be the best index score in a track:
 
-Examples:
+- `basic`: `μ - (M - μ) / 2`
+- `good`: `μ`
+- `high`: `μ + (M - μ) / 2`
+- `max`: `M`
 
-- `basic` keeps very cheap models that still clear 60% of the best available score.
-- `good` is the default and keeps models at 80% or better.
-- `high` is for harder tasks where you want models closer to the top.
-- `max` keeps only models very close to the best available score.
+The selected level is an inclusive minimum threshold: models with an index score at or above it remain eligible. The values are calculated from the data for each track; no fixed percentages are used.
 
 **Tracks**
 
@@ -153,12 +150,13 @@ The CLI presents the tracks in that order. If one track has no usable score or c
 
 The calculation runs separately for Intelligence, Coding, and Agentic:
 
-1. Find the highest index score in the track.
-2. Multiply it by the selected quality threshold.
-3. Remove models below that threshold.
-4. Calculate the effective cost for every remaining model.
-5. Calculate `Value Score = Index Score / Effective Cost`.
-6. Sort by Value Score from highest to lowest and show the top five.
+1. Collect every valid index score in the track.
+2. Calculate the average and highest index score.
+3. Derive the selected quality threshold from those two values.
+4. Remove models below that threshold.
+5. Calculate the effective cost for every remaining model.
+6. Calculate `Value Score = Index Score / Effective Cost`.
+7. Sort by Value Score from highest to lowest and show the top five.
 
 The formulas use these short names:
 
@@ -228,10 +226,15 @@ Version 2.0 changes the machine-readable cost representation. The old, generic `
 Each track includes:
 
 - `status`: `ok` or `unavailable`; unavailable tracks also include `error` and an empty `models` list.
+- `average_score`: the average of all valid index scores used for the track's quality scale.
+- `max_score`: the highest valid index score used for the track's quality scale.
+- `min_score_threshold`: the selected absolute quality threshold for the track.
 - `value_method`: the formula or method used for the track.
 - `effective_cost_type`: `reported` for Intelligence or `estimated` for Coding and Agentic.
 - `effective_cost_unit`: `USD per benchmark task` for Intelligence or `USD per 1M weighted tokens` for Coding and Agentic.
 - `value_unit`: the track-specific interpretation of `value_score`.
+
+The former `quality_threshold_ratio` and `quality_threshold_percent` fields are not emitted; quality thresholds are now absolute, track-specific index scores.
 
 Each ranked model includes `effective_cost`, `value_score`, and `cache_price_fallback` in addition to its rank, identity, and index score. Coding and Agentic models also include `input_price_1m`, `output_price_1m`, and `cache_hit_price_1m`; Intelligence models omit those token-price fields because their Value calculation uses `Cost/Task`. The root result includes `intelligence_index_version` from the API response when available, as well as the unchanged source-attribution string in `data_credit`.
 

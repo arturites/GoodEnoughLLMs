@@ -25,12 +25,7 @@ DEFAULT_ENV_CONTENT = "# GoodEnoughLLMs API key\nAA_KEY=\n"
 API_URL = "https://artificialanalysis.ai/api/v2/language/models/free"
 DATA_CREDIT = "Data provided by Artificial Analysis - https://artificialanalysis.ai/"
 TOP_N = 5
-QUALITY_THRESHOLDS = {
-    "basic": 0.60,
-    "good": 0.80,
-    "high": 0.90,
-    "max": 0.99,
-}
+QUALITY_LEVELS = ("basic", "good", "high", "max")
 TRACK_CONFIGS = (
     {
         "name": "Intelligence",
@@ -168,11 +163,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--quality",
-        choices=list(QUALITY_THRESHOLDS),
+        choices=list(QUALITY_LEVELS),
         default="good",
         help=(
-            "Minimum quality threshold relative to the best available model in each track. "
-            "basic=60%%, good=80%%, high=90%%, max=99%%. Default: good."
+            "Minimum quality threshold derived from the average and best valid index scores "
+            "in each track. basic is below good, good=average, high is halfway to max, "
+            "and max=best. Default: good."
         ),
     )
     parser.add_argument(
@@ -594,7 +590,22 @@ def render_table(headers: list[str], rows: list[list[str]], alignments: list[str
     print(border)
 
 
-def track_metadata(track_config: dict[str, str], threshold_ratio: float) -> dict[str, object]:
+def quality_thresholds_for_scores(average_score: float, max_score: float) -> dict[str, float]:
+    half_gap = (max_score - average_score) / 2
+    return {
+        "basic": average_score - half_gap,
+        "good": average_score,
+        "high": average_score + half_gap,
+        "max": max_score,
+    }
+
+
+def track_metadata(
+    track_config: dict[str, str],
+    average_score: float | None,
+    max_score: float | None,
+    min_score_threshold: float | None,
+) -> dict[str, object]:
     return {
         "name": track_config["name"],
         "score_key": track_config["score_key"],
@@ -606,15 +617,16 @@ def track_metadata(track_config: dict[str, str], threshold_ratio: float) -> dict
         "effective_cost_type": track_config["effective_cost_type"],
         "effective_cost_unit": track_config["effective_cost_unit"],
         "value_unit": track_config["value_unit"],
-        "quality_threshold_ratio": threshold_ratio,
-        "quality_threshold_percent": int(threshold_ratio * 100),
+        "average_score": average_score,
+        "max_score": max_score,
+        "min_score_threshold": min_score_threshold,
     }
 
 
 def build_track_result(
     models: list[dict[str, object]],
     track_config: dict[str, str],
-    threshold_ratio: float,
+    quality: str,
 ) -> dict[str, object]:
     score_key = track_config["score_key"]
     track_name = track_config["name"]
@@ -642,10 +654,12 @@ def build_track_result(
             EXIT_NO_RESULTS,
         )
 
-    max_score = max(candidate["score"] for candidate in candidates)
+    scores = [candidate["score"] for candidate in candidates]
+    max_score = max(scores)
     if max_score <= 0:
         raise AppError(f"The maximum score for the {track_name} track was not positive.", EXIT_NO_RESULTS)
-    threshold = max_score * threshold_ratio
+    average_score = sum(scores) / len(scores)
+    threshold = quality_thresholds_for_scores(average_score, max_score)[quality]
     scored = []
     for candidate in candidates:
         if candidate["score"] < threshold:
@@ -707,25 +721,20 @@ def build_track_result(
         )
 
     return {
-        **track_metadata(track_config, threshold_ratio),
+        **track_metadata(track_config, average_score, max_score, threshold),
         "status": "ok",
-        "max_score": max_score,
-        "min_score_threshold": threshold,
         "models": models_output,
     }
 
 
 def unavailable_track_result(
     track_config: dict[str, str],
-    threshold_ratio: float,
     message: str,
 ) -> dict[str, object]:
     return {
-        **track_metadata(track_config, threshold_ratio),
+        **track_metadata(track_config, None, None, None),
         "status": "unavailable",
         "error": message,
-        "max_score": None,
-        "min_score_threshold": None,
         "models": [],
     }
 
@@ -736,7 +745,6 @@ def build_result(
     *,
     interactive: bool = False,
 ) -> dict[str, object]:
-    threshold_ratio = QUALITY_THRESHOLDS[quality]
     env_file = env_file_path()
     ensure_user_env_file(env_file)
     api_key = resolve_api_key(env_file, interactive=interactive)
@@ -749,11 +757,11 @@ def build_result(
     tracks = []
     for track_config in TRACK_CONFIGS:
         try:
-            tracks.append(build_track_result(models, track_config, threshold_ratio))
+            tracks.append(build_track_result(models, track_config, quality))
         except AppError as exc:
             if exc.exit_code != EXIT_NO_RESULTS:
                 raise
-            tracks.append(unavailable_track_result(track_config, threshold_ratio, str(exc)))
+            tracks.append(unavailable_track_result(track_config, str(exc)))
 
     if not any(track.get("status") == "ok" for track in tracks):
         raise AppError("No tracks contained usable model and cost data.", EXIT_NO_RESULTS)
@@ -763,8 +771,6 @@ def build_result(
         "version": VERSION,
         "intelligence_index_version": intelligence_index_version,
         "selected_quality": quality,
-        "quality_threshold_ratio": threshold_ratio,
-        "quality_threshold_percent": int(threshold_ratio * 100),
         "provider_filter": provider_filter,
         "tracks": tracks,
         "data_credit": DATA_CREDIT,
@@ -792,7 +798,7 @@ def render_human_output(result: dict[str, object]) -> None:
             print(f"Unavailable: {track.get('error', 'No usable data.')}")
             print()
             continue
-        print(f"Quality threshold: {track['quality_threshold_percent']}%")
+        print(f"Average {track['score_label']}: {track['average_score']:.1f}")
         print(f"Maximum {track['score_label']}: {track['max_score']:.1f}")
         print(f"Minimum {track['score_label']} threshold: {track['min_score_threshold']:.1f}")
         print(f"Value basis: {track['value_description']}")
