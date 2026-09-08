@@ -167,7 +167,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default="good",
         help=(
             "Minimum quality threshold derived from the average and best valid index scores "
-            "in each track. basic is below good, good=average, high is halfway to max, "
+            "in each track. basic=average, good is one third toward max, high is two thirds, "
             "and max=best. Default: good."
         ),
     )
@@ -591,11 +591,11 @@ def render_table(headers: list[str], rows: list[list[str]], alignments: list[str
 
 
 def quality_thresholds_for_scores(average_score: float, max_score: float) -> dict[str, float]:
-    half_gap = (max_score - average_score) / 2
+    third_gap = (max_score - average_score) / 3
     return {
-        "basic": average_score - half_gap,
-        "good": average_score,
-        "high": average_score + half_gap,
+        "basic": average_score,
+        "good": average_score + third_gap,
+        "high": average_score + (2 * third_gap),
         "max": max_score,
     }
 

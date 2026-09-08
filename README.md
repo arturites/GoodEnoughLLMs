@@ -131,12 +131,12 @@ gelm 2.1.0
 
 Let `μ` be the average index score and `M` be the best index score in a track:
 
-- `basic`: `μ - (M - μ) / 2`
-- `good`: `μ`
-- `high`: `μ + (M - μ) / 2`
+- `basic`: `μ`
+- `good`: `μ + (M - μ) / 3`
+- `high`: `μ + 2 × (M - μ) / 3`
 - `max`: `M`
 
-The selected level is an inclusive minimum threshold: models with an index score at or above it remain eligible. The values are calculated from the data for each track; no fixed percentages are used.
+The selected level is an inclusive minimum threshold: models with an index score at or above it remain eligible. The values are calculated from the data for each track; no fixed percentages are used. Each step from `basic` to `max` covers one third of the distance from the average to the best score.
 
 **Tracks**
 
