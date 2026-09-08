@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Quality levels from average to best score</title>
+  <desc id="desc">For each track, the average score μ and best score M define a range. The range is divided into three equal parts: basic is μ, good is μ plus one third of the gap, high is μ plus two thirds of the gap, and max is M. Models with a score at or above the selected threshold qualify.</desc>
+
+  <style>
+    :root {
+      --paper: #ffffff;
+      --ink: #000000;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --paper: #000000;
+        --ink: #ffffff;
+      }
+    }
+
+    .hand {
+      font-family: "Comic Sans MS", "Marker Felt", "Segoe Print", "Bradley Hand", cursive;
+      fill: var(--ink);
+    }
+
+    .line {
+      fill: none;
+      stroke: var(--ink);
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  </style>
+
+  <rect width="1200" height="720" fill="var(--paper)"/>
+
+  <!-- Title -->
+  <text x="74" y="92" class="hand" font-size="46" font-weight="700" transform="rotate(-1 74 92)">Quality levels</text>
+  <path d="M76 110 C 245 118, 387 104, 535 112" class="line" stroke-width="3"/>
+  <text x="78" y="148" class="hand" font-size="21" opacity="0.72">One threshold scale for each track.</text>
+
+  <!-- Definitions and the gap -->
+  <text x="148" y="218" text-anchor="middle" class="hand" font-size="22">μ = average score</text>
+  <text x="1052" y="218" text-anchor="middle" class="hand" font-size="22">M = best score</text>
+  <text x="600" y="218" text-anchor="middle" class="hand" font-size="21" opacity="0.72">the gap M − μ is split into 3 equal parts</text>
+
+  <path d="M155 248 C 350 242, 470 254, 600 247 S 850 254, 1045 248" class="line" stroke-width="2"/>
+  <path d="M157 248 l16 -8 M157 248 l16 8 M1043 248 l-16 -8 M1043 248 l-16 8" class="line" stroke-width="2"/>
+
+  <!-- Hand-drawn score scale -->
+  <path d="M150 326 C 248 318, 350 334, 450 326 S 650 334, 750 326 S 950 334, 1050 326" class="line" stroke-width="6"/>
+  <path d="M150 333 C 248 325, 350 341, 450 333 S 650 341, 750 333 S 950 341, 1050 333" class="line" stroke-width="2" opacity="0.42"/>
+
+  <!-- Sketch-like threshold marks -->
+  <g fill="var(--paper)" stroke="var(--ink)" stroke-width="5" stroke-linejoin="round">
+    <path d="M150 304 C 162 301, 176 309, 174 326 C 173 343, 160 353, 146 348 C 132 344, 127 329, 133 316 C 137 308, 143 305, 150 304 Z"/>
+    <path d="M450 304 C 464 303, 476 312, 474 327 C 473 344, 459 352, 446 348 C 432 344, 427 329, 433 316 C 437 309, 443 305, 450 304 Z"/>
+    <path d="M750 304 C 764 302, 777 311, 775 327 C 774 343, 760 353, 746 348 C 733 344, 727 329, 733 316 C 737 309, 743 305, 750 304 Z"/>
+    <path d="M1050 304 C 1064 303, 1077 311, 1075 327 C 1074 344, 1060 352, 1046 348 C 1033 344, 1027 329, 1033 316 C 1037 309, 1043 305, 1050 304 Z"/>
+  </g>
+
+  <!-- Levels -->
+  <g class="hand" text-anchor="middle">
+    <text x="150" y="414" font-size="25" font-weight="700" transform="rotate(-2 150 414)">basic</text>
+    <text x="150" y="456" font-size="34">μ</text>
+
+    <text x="450" y="414" font-size="25" font-weight="700" transform="rotate(1 450 414)">good</text>
+    <text x="450" y="456" font-size="25">μ + (M − μ) / 3</text>
+
+    <text x="750" y="414" font-size="25" font-weight="700" transform="rotate(-1 750 414)">high</text>
+    <text x="750" y="456" font-size="23">μ + 2 × (M − μ) / 3</text>
+
+    <text x="1050" y="414" font-size="25" font-weight="700" transform="rotate(2 1050 414)">max</text>
+    <text x="1050" y="456" font-size="34">M</text>
+  </g>
+
+  <text x="150" y="501" text-anchor="middle" class="hand" font-size="18" opacity="0.72">more models qualify</text>
+  <text x="1050" y="501" text-anchor="middle" class="hand" font-size="18" opacity="0.72">fewer models qualify</text>
+
+  <!-- Essential rule -->
+  <path d="M225 554 C 360 547, 530 558, 680 552 S 850 557, 975 553 L970 642 C 805 648, 650 640, 500 646 S 330 641, 230 644 Z" class="line" stroke-width="3"/>
+  <text x="600" y="590" text-anchor="middle" class="hand" font-size="20">A model qualifies when its score is</text>
+  <text x="600" y="628" text-anchor="middle" class="hand" font-size="30" font-weight="700">≥ the selected threshold</text>
+
+  <text x="600" y="690" text-anchor="middle" class="hand" font-size="17" opacity="0.72">No fixed percentages — each step is one third of M − μ.</text>
+</svg>

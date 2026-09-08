@@ -127,6 +127,8 @@ gelm 2.1.0
 
 **Quality Levels**
 
+![How GoodEnoughLLMs calculates quality levels](quality-levels.svg)
+
 `quality` is a threshold derived independently for each track from all valid index scores. The scores are collected after applying an optional provider filter and before models without usable track-specific cost data are removed from the Value ranking. It is not a reasoning-budget knob.
 
 Let `μ` be the average index score and `M` be the best index score in a track:
