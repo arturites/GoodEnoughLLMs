@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-09-08
+
 ### Changed
 
 - Derive the `basic`, `good`, `high`, and `max` quality thresholds from the average and best index scores in each track, with equal thirds between them instead of fixed percentage thresholds.
@@ -24,5 +26,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Use the per-user configuration file as the primary API-key location.
 - Keep direct source-tree execution available through `python3 goodenoughllms.py`.
 
-[unreleased]: https://github.com/arturites/GoodEnoughLLMs/compare/v2.1.0...HEAD
+[unreleased]: https://github.com/arturites/GoodEnoughLLMs/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/arturites/GoodEnoughLLMs/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/arturites/GoodEnoughLLMs/compare/v2.0.0...v2.1.0

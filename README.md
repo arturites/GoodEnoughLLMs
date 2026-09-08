@@ -119,10 +119,10 @@ Successful `--json` results are written to stdout. Errors are written as JSON to
 
 When `gelm --json` or another non-interactive invocation has no key, it exits with code `3` and does not prompt.
 
-GoodEnoughLLMs reports its version as `2.1.0`:
+GoodEnoughLLMs reports its version as `2.2.0`:
 
 ```text
-gelm 2.1.0
+gelm 2.2.0
 ```
 
 **Quality Levels**

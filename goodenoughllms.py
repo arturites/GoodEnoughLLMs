@@ -17,7 +17,7 @@ import requests
 
 
 APP_NAME = "GoodEnoughLLMs"
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 CONFIG_DIR_NAME = ".goodenoughllms"
 ENV_FILE_NAME = ".env"
 API_KEY_PLACEHOLDER = "your_artificial_analysis_api_key_here"
